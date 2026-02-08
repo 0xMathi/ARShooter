@@ -16,6 +16,11 @@ export class SoundManager {
     return this.ctx;
   }
 
+  /** Random detune in cents (±200 = ~±1 semitone) */
+  private randomDetune(): number {
+    return (Math.random() * 2 - 1) * 200;
+  }
+
   /** Laser/shoot sound - short zap */
   playShoot(): void {
     const ctx = this.getContext();
@@ -23,6 +28,7 @@ export class SoundManager {
     const gain = ctx.createGain();
 
     osc.type = 'sawtooth';
+    osc.detune.value = this.randomDetune();
     osc.frequency.setValueAtTime(880, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(110, ctx.currentTime + 0.15);
 
@@ -51,6 +57,7 @@ export class SoundManager {
     // Low thump
     const osc = ctx.createOscillator();
     osc.type = 'sine';
+    osc.detune.value = this.randomDetune();
     osc.frequency.setValueAtTime(150, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.12);
 
@@ -78,6 +85,7 @@ export class SoundManager {
     const gain = ctx.createGain();
 
     osc.type = 'sine';
+    osc.detune.value = this.randomDetune();
     osc.frequency.setValueAtTime(300, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.2);
 

@@ -12,6 +12,11 @@ export class SceneManager {
   private width: number;
   private height: number;
 
+  // Screen shake state
+  private shakeIntensity = 0;
+  private shakeDecay = 0;
+  private baseCameraY = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.width = window.innerWidth;
     this.height = window.innerHeight;
@@ -70,7 +75,23 @@ export class SceneManager {
     return { width: this.width, height: this.height };
   }
 
+  /** Trigger vertical screen shake */
+  shake(intensity = 8): void {
+    this.shakeIntensity = intensity;
+    this.shakeDecay = intensity;
+  }
+
   render(): void {
+    // Apply screen shake (vertical only for positive feel)
+    if (this.shakeDecay > 0.1) {
+      const offset = (Math.random() * 2 - 1) * this.shakeDecay;
+      this.camera.position.y = this.baseCameraY + offset;
+      this.shakeDecay *= 0.85; // exponential decay
+    } else if (this.shakeDecay > 0) {
+      this.camera.position.y = this.baseCameraY;
+      this.shakeDecay = 0;
+    }
+
     this.renderer.render(this.scene, this.camera);
   }
 
