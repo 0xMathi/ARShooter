@@ -16,7 +16,7 @@ export class ScoreManager {
     this.onChange = callback;
   }
 
-  hit(): { points: number; combo: number; multiplier: number } {
+  hit(tierMultiplier = 1): { points: number; combo: number; multiplier: number } {
     const now = performance.now();
 
     // Reset combo if too much time passed
@@ -29,7 +29,7 @@ export class ScoreManager {
     if (this.combo > this.maxCombo) this.maxCombo = this.combo;
 
     const multiplier = this.getMultiplier();
-    const points = Math.round(this.basePoints * multiplier);
+    const points = Math.round(this.basePoints * multiplier * tierMultiplier);
     this.score += points;
 
     this.onChange?.();

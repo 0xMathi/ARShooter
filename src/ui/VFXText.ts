@@ -61,9 +61,10 @@ export class VFXText {
     requestAnimationFrame(animate);
   }
 
-  /** HIT feedback */
-  hit(x: number, y: number, points: number, combo: number): void {
-    this.spawn(`HIT +${points}`, x, y, '#00ff88', 1.2);
+  /** HIT feedback - color based on trophy tier */
+  hit(x: number, y: number, points: number, combo: number, tierColor?: string): void {
+    const color = tierColor ?? '#00ff88';
+    this.spawn(`+${points}`, x, y, color, 1.2);
 
     if (combo >= 3) {
       setTimeout(() => {

@@ -6,6 +6,7 @@ import { SceneManager } from './engine/SceneManager';
 import { HandTracker } from './tracking/HandTracker';
 import { GestureDetector } from './tracking/GestureDetector';
 import { DiscManager } from './game/DiscManager';
+import { loadTrophyAssets } from './game/TrophyBuilder';
 import { ShootingSystem } from './game/ShootingSystem';
 import { ScoreManager } from './game/ScoreManager';
 import { GameManager } from './game/GameManager';
@@ -51,8 +52,11 @@ async function init(): Promise<void> {
     });
     loading.setProgress(100);
 
+    loading.setStatus('Loading trophy assets...');
+    const trophyAssets = await loadTrophyAssets(sceneManager.renderer);
+
     const gestureDetector = new GestureDetector();
-    const discManager = new DiscManager(sceneManager);
+    const discManager = new DiscManager(sceneManager, trophyAssets);
     const shootingSystem = new ShootingSystem(sceneManager);
     const scoreManager = new ScoreManager();
     const soundManager = new SoundManager();
@@ -108,15 +112,24 @@ async function init(): Promise<void> {
 
     const HIT_STOP_DURATION = 60; // ms
 
+    // Trophy tier scoring: Gold=5x, Silver=2x, Bronze=1x
+    const TIER_SCORE: Record<string, number> = { gold: 5, silver: 2, bronze: 1 };
+    const TIER_VFX_COLOR: Record<string, string> = {
+      gold: '#FFD700',
+      silver: '#D8D8D8',
+      bronze: '#CD7F32',
+    };
+
     /** Central shoot function */
     function shoot(x: number, y: number): void {
       soundManager.playShoot();
 
       const hit = discManager.checkHit(x, y);
       if (hit) {
-        const result = scoreManager.hit();
+        const tierMult = TIER_SCORE[hit.tier];
+        const result = scoreManager.hit(tierMult);
         soundManager.playHit();
-        vfxText.hit(hit.x, hit.y, result.points, result.combo);
+        vfxText.hit(hit.x, hit.y, result.points, result.combo, TIER_VFX_COLOR[hit.tier]);
         sceneManager.shake(6 + Math.min(result.combo, 10));
         hitStopUntil = performance.now() + HIT_STOP_DURATION;
         hud.popScore();

@@ -1,85 +1,100 @@
 import * as THREE from 'three';
 import type { SceneManager } from '../engine/SceneManager';
+import { createTrophy, getTierColor, type TrophyTier, type TrophyAssets } from './TrophyBuilder';
 
-interface Disc {
+interface Trophy {
   id: number;
   mesh: THREE.Group;
   velocity: THREE.Vector2;
   alive: boolean;
   screenX: number;
   screenY: number;
-  radius: number; // screen-space hit radius
+  radius: number;
+  tier: TrophyTier;
 }
 
-const DISC_COLORS = [0x00f0ff, 0xff00e0, 0xffaa00, 0x00ff88, 0xff4444];
+// Spawn weights: [tier, cumulative probability]
+const TIER_WEIGHTS: [TrophyTier, number][] = [
+  ['bronze', 0.55],
+  ['silver', 0.85],
+  ['gold', 1.0],
+];
+
+// Tier-specific settings
+const TIER_SPEED_MULT: Record<TrophyTier, number> = { bronze: 1, silver: 1.2, gold: 1.5 };
+const TIER_SCALE: Record<TrophyTier, number> = { bronze: 1, silver: 0.85, gold: 0.7 };
+const TIER_HIT_RADIUS: Record<TrophyTier, number> = { bronze: 90, silver: 80, gold: 65 };
+
 const TARGET_COUNT = 4;
-const DISC_SPEED_MIN = 60; // pixels per second
-const DISC_SPEED_MAX = 120;
-const DISC_RADIUS_3D = 40;
-const HIT_RADIUS = 90; // screen pixels for collision - generous for gesture aiming
-const SPEED_RAMP_INTERVAL = 30; // seconds between speed increases
-const SPEED_RAMP_AMOUNT = 15; // pixels/sec added per interval
-const SPEED_RAMP_MAX = 80; // max total bonus speed
+const BASE_SPEED_MIN = 60;
+const BASE_SPEED_MAX = 120;
+const SPEED_RAMP_INTERVAL = 30;
+const SPEED_RAMP_AMOUNT = 15;
+const SPEED_RAMP_MAX = 80;
 
 /**
- * Manages flying disc enemies.
- * Spawns at edges, flies toward center.
- * Maintains TARGET_COUNT discs on screen at all times.
- * Difficulty ramps up gradually over time.
+ * Manages Cannes Lions trophy targets.
+ * Three tiers: Bronze (common), Silver (medium), Gold (rare + fast + small).
  */
 export class DiscManager {
   private scene: SceneManager;
-  private discs: Disc[] = [];
+  private assets: TrophyAssets;
+  private trophies: Trophy[] = [];
   private nextId = 0;
   private fragments: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number }[] = [];
   private elapsedTime = 0;
 
-  constructor(scene: SceneManager) {
+  constructor(scene: SceneManager, assets: TrophyAssets) {
     this.scene = scene;
+    this.assets = assets;
   }
 
-  /** Current speed bonus from difficulty ramp */
   private getSpeedBonus(): number {
     const intervals = Math.floor(this.elapsedTime / SPEED_RAMP_INTERVAL);
     return Math.min(intervals * SPEED_RAMP_AMOUNT, SPEED_RAMP_MAX);
   }
 
-  /** Spawn initial discs */
+  private pickTier(): TrophyTier {
+    const r = Math.random();
+    for (const [tier, threshold] of TIER_WEIGHTS) {
+      if (r < threshold) return tier;
+    }
+    return 'bronze';
+  }
+
   start(): void {
     for (let i = 0; i < TARGET_COUNT; i++) {
-      this.spawnDisc();
+      this.spawnTrophy();
     }
   }
 
-  /** Update all disc positions and fragments */
   update(dt: number): void {
     this.elapsedTime += dt;
     const { width, height } = this.scene.getSize();
 
-    for (const disc of this.discs) {
-      if (!disc.alive) continue;
+    for (const trophy of this.trophies) {
+      if (!trophy.alive) continue;
 
-      // Move toward center
-      disc.screenX += disc.velocity.x * dt;
-      disc.screenY += disc.velocity.y * dt;
+      trophy.screenX += trophy.velocity.x * dt;
+      trophy.screenY += trophy.velocity.y * dt;
 
-      // Update 3D position
-      const worldPos = this.scene.screenToWorld(disc.screenX, disc.screenY);
-      disc.mesh.position.set(worldPos.x, worldPos.y, 0);
+      const worldPos = this.scene.screenToWorld(trophy.screenX, trophy.screenY);
+      trophy.mesh.position.set(worldPos.x, worldPos.y, 0);
 
-      // Spin the disc
-      disc.mesh.rotation.x += dt * 2;
-      disc.mesh.rotation.z += dt * 0.5;
+      // Gentle face-on spin with slight wobble (plane faces camera)
+      const t = this.elapsedTime;
+      trophy.mesh.rotation.z += dt * 1.2;
+      trophy.mesh.rotation.x = Math.sin(t * 2 + trophy.id * 2) * 0.15;
+      trophy.mesh.rotation.y = Math.cos(t * 3 + trophy.id * 3) * 0.15;
 
-      // Kill if past center area (off screen on other side)
       const margin = 100;
       if (
-        disc.screenX < -margin ||
-        disc.screenX > width + margin ||
-        disc.screenY < -margin ||
-        disc.screenY > height + margin
+        trophy.screenX < -margin ||
+        trophy.screenX > width + margin ||
+        trophy.screenY < -margin ||
+        trophy.screenY > height + margin
       ) {
-        this.removeDisc(disc);
+        this.removeTrophy(trophy);
       }
     }
 
@@ -87,7 +102,7 @@ export class DiscManager {
     for (let i = this.fragments.length - 1; i >= 0; i--) {
       const frag = this.fragments[i];
       frag.mesh.position.add(frag.velocity.clone().multiplyScalar(dt));
-      frag.velocity.y -= 400 * dt; // gravity
+      frag.velocity.y -= 400 * dt;
       frag.life -= dt;
 
       const mat = frag.mesh.material as THREE.MeshStandardMaterial;
@@ -101,72 +116,71 @@ export class DiscManager {
       }
     }
 
-    // Maintain target count
-    this.discs = this.discs.filter((d) => d.alive);
-    while (this.discs.length < TARGET_COUNT) {
-      this.spawnDisc();
+    this.trophies = this.trophies.filter((t) => t.alive);
+    while (this.trophies.length < TARGET_COUNT) {
+      this.spawnTrophy();
     }
   }
 
-  /** Check if a screen position hits any disc. Returns disc screen pos or null. */
-  checkHit(screenX: number, screenY: number): { x: number; y: number } | null {
-    let closest: Disc | null = null;
+  /** Check hit. Returns position + tier or null. */
+  checkHit(screenX: number, screenY: number): { x: number; y: number; tier: TrophyTier } | null {
+    let closest: Trophy | null = null;
     let closestDist = Infinity;
 
-    for (const disc of this.discs) {
-      if (!disc.alive) continue;
-      const dx = screenX - disc.screenX;
-      const dy = screenY - disc.screenY;
+    for (const trophy of this.trophies) {
+      if (!trophy.alive) continue;
+      const dx = screenX - trophy.screenX;
+      const dy = screenY - trophy.screenY;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < HIT_RADIUS && dist < closestDist) {
-        closest = disc;
+      if (dist < trophy.radius && dist < closestDist) {
+        closest = trophy;
         closestDist = dist;
       }
     }
 
     if (closest) {
-      const pos = { x: closest.screenX, y: closest.screenY };
-      this.shatterDisc(closest);
-      return pos;
+      const result = { x: closest.screenX, y: closest.screenY, tier: closest.tier };
+      this.shatterTrophy(closest);
+      return result;
     }
 
     return null;
   }
 
-  /** Get all alive disc positions for aim assist */
   getDiscPositions(): { x: number; y: number }[] {
-    return this.discs
-      .filter((d) => d.alive)
-      .map((d) => ({ x: d.screenX, y: d.screenY }));
+    return this.trophies
+      .filter((t) => t.alive)
+      .map((t) => ({ x: t.screenX, y: t.screenY }));
   }
 
-  private spawnDisc(): void {
+  private spawnTrophy(): void {
     const { width, height } = this.scene.getSize();
-    const edge = Math.floor(Math.random() * 4); // 0=top, 1=right, 2=bottom, 3=left
-    let startX: number, startY: number;
+    const tier = this.pickTier();
 
+    const edge = Math.floor(Math.random() * 4);
+    let startX: number, startY: number;
     const margin = 60;
+
     switch (edge) {
-      case 0: // top
+      case 0:
         startX = Math.random() * width;
         startY = -margin;
         break;
-      case 1: // right
+      case 1:
         startX = width + margin;
         startY = Math.random() * height;
         break;
-      case 2: // bottom
+      case 2:
         startX = Math.random() * width;
         startY = height + margin;
         break;
-      default: // left
+      default:
         startX = -margin;
         startY = Math.random() * height;
         break;
     }
 
-    // Target: random point near center
     const targetX = width / 2 + (Math.random() - 0.5) * width * 0.4;
     const targetY = height / 2 + (Math.random() - 0.5) * height * 0.4;
 
@@ -174,90 +188,74 @@ export class DiscManager {
     const dy = targetY - startY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const bonus = this.getSpeedBonus();
-    const speed = DISC_SPEED_MIN + bonus + Math.random() * (DISC_SPEED_MAX - DISC_SPEED_MIN);
+    const baseSpeed = BASE_SPEED_MIN + bonus + Math.random() * (BASE_SPEED_MAX - BASE_SPEED_MIN);
+    const speed = baseSpeed * TIER_SPEED_MULT[tier];
     const velocity = new THREE.Vector2(
       (dx / dist) * speed,
       (dy / dist) * speed
     );
 
-    // Create 3D disc mesh
-    const color = DISC_COLORS[Math.floor(Math.random() * DISC_COLORS.length)];
-    const group = new THREE.Group();
-
-    // Main disc body
-    const geometry = new THREE.CylinderGeometry(DISC_RADIUS_3D, DISC_RADIUS_3D, 6, 16);
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 0.5,
-      metalness: 0.7,
-      roughness: 0.3,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    group.add(mesh);
-
-    // Glowing ring
-    const ringGeo = new THREE.TorusGeometry(DISC_RADIUS_3D + 3, 2, 8, 24);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color,
-      emissive: color,
-      emissiveIntensity: 1,
-      transparent: true,
-      opacity: 0.6,
-    });
-    group.add(new THREE.Mesh(ringGeo, ringMat));
+    // Build trophy mesh
+    const group = createTrophy(tier, this.assets);
+    const scale = TIER_SCALE[tier];
+    group.scale.set(scale, scale, scale);
 
     const worldPos = this.scene.screenToWorld(startX, startY);
     group.position.set(worldPos.x, worldPos.y, 0);
 
     this.scene.scene.add(group);
 
-    this.discs.push({
+    this.trophies.push({
       id: this.nextId++,
       mesh: group,
       velocity,
       alive: true,
       screenX: startX,
       screenY: startY,
-      radius: HIT_RADIUS,
+      radius: TIER_HIT_RADIUS[tier],
+      tier,
     });
   }
 
-  private shatterDisc(disc: Disc): void {
-    disc.alive = false;
+  private disposeMesh(mesh: THREE.Mesh): void {
+    mesh.geometry.dispose();
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const mat of mats) mat.dispose();
+  }
 
-    // Read color BEFORE disposing
-    const color = (
-      (disc.mesh.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial
-    ).color.getHex();
-    const pos = this.scene.screenToWorld(disc.screenX, disc.screenY);
+  private shatterTrophy(trophy: Trophy): void {
+    trophy.alive = false;
 
-    // Remove and dispose disc meshes
-    this.scene.scene.remove(disc.mesh);
-    disc.mesh.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        (child.material as THREE.Material).dispose();
-      }
+    const color = getTierColor(trophy.tier);
+    const pos = this.scene.screenToWorld(trophy.screenX, trophy.screenY);
+
+    this.scene.scene.remove(trophy.mesh);
+    trophy.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) this.disposeMesh(child);
     });
 
-    for (let i = 0; i < 8; i++) {
-      const fragGeo = new THREE.TetrahedronGeometry(8 + Math.random() * 8);
+    // More fragments for higher tiers
+    const fragCount = trophy.tier === 'gold' ? 12 : trophy.tier === 'silver' ? 10 : 8;
+
+    for (let i = 0; i < fragCount; i++) {
+      const fragGeo = new THREE.TetrahedronGeometry(6 + Math.random() * 8);
       const fragMat = new THREE.MeshStandardMaterial({
         color,
         emissive: color,
         emissiveIntensity: 0.8,
+        metalness: 0.9,
+        roughness: 0.2,
         transparent: true,
         opacity: 1,
       });
       const fragMesh = new THREE.Mesh(fragGeo, fragMat);
       fragMesh.position.copy(pos);
 
-      const angle = (Math.PI * 2 * i) / 8 + Math.random() * 0.5;
-      const speed = 200 + Math.random() * 300;
+      const angle = (Math.PI * 2 * i) / fragCount + Math.random() * 0.5;
+      const spd = 200 + Math.random() * 300;
       const fragVelocity = new THREE.Vector3(
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed + 100,
+        Math.cos(angle) * spd,
+        Math.sin(angle) * spd + 100,
         (Math.random() - 0.5) * 200
       );
 
@@ -266,27 +264,24 @@ export class DiscManager {
     }
   }
 
-  private removeDisc(disc: Disc): void {
-    disc.alive = false;
-    this.scene.scene.remove(disc.mesh);
-    disc.mesh.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        (child.material as THREE.Material).dispose();
-      }
+  private removeTrophy(trophy: Trophy): void {
+    trophy.alive = false;
+    this.scene.scene.remove(trophy.mesh);
+    trophy.mesh.traverse((child) => {
+      if (child instanceof THREE.Mesh) this.disposeMesh(child);
     });
   }
 
   dispose(): void {
-    for (const disc of this.discs) {
-      this.removeDisc(disc);
+    for (const trophy of this.trophies) {
+      this.removeTrophy(trophy);
     }
     for (const frag of this.fragments) {
       this.scene.scene.remove(frag.mesh);
       (frag.mesh.material as THREE.Material).dispose();
       frag.mesh.geometry.dispose();
     }
-    this.discs = [];
+    this.trophies = [];
     this.fragments = [];
   }
 }
