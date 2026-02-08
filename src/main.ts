@@ -15,6 +15,7 @@ import { VFXText } from './ui/VFXText';
 import { StartScreen } from './ui/StartScreen';
 import { GameOverScreen } from './ui/GameOverScreen';
 import { SoundManager } from './audio/SoundManager';
+import { MusicSequencer } from './audio/MusicSequencer';
 
 const DETECTION_INTERVAL = 2; // ~30fps detection for snappier tracking
 
@@ -55,6 +56,7 @@ async function init(): Promise<void> {
     const shootingSystem = new ShootingSystem(sceneManager);
     const scoreManager = new ScoreManager();
     const soundManager = new SoundManager();
+    const music = new MusicSequencer(soundManager);
     const hud = new HUD();
     const vfxText = new VFXText();
     const gameManager = new GameManager(scoreManager, discManager);
@@ -65,6 +67,8 @@ async function init(): Promise<void> {
 
     // --- Game Over handler ---
     gameManager.setOnGameOver(() => {
+      music.stop();
+      soundManager.playGameOver();
       gameOverScreen.show(scoreManager.getScore(), scoreManager.getMaxCombo());
     });
 
@@ -77,6 +81,7 @@ async function init(): Promise<void> {
       if (state === 'IDLE') {
         // Tap to start
         gameManager.startGame();
+        music.start();
         if (startScreen) {
           startScreen.hide();
           startScreen = null;
@@ -163,6 +168,7 @@ async function init(): Promise<void> {
         if (pistolHeldFrames >= 8) {
           pistolHeldFrames = 0;
           gameManager.startGame();
+          music.start();
           if (startScreen) {
             startScreen.hide();
             startScreen = null;
