@@ -1,10 +1,19 @@
 /**
  * Start screen overlay.
  * "The Big Lie." - Cannes Lions satirical branding.
+ * Gold confetti rain + sequential entrance animation.
  */
+
+const CONFETTI_EMOJIS = [
+  '\u{1F3C6}', // trophy
+  '\u{1F377}', // wine
+  '\u{1F334}', // palm
+  '\u{2B50}',  // star
+  '\u{1F981}', // lion
+];
+
 export class StartScreen {
   private overlay: HTMLDivElement;
-  private handIcon: HTMLDivElement;
 
   constructor() {
     this.overlay = document.createElement('div');
@@ -25,7 +34,34 @@ export class StartScreen {
       color: '#fff',
       textAlign: 'center',
       padding: '2rem',
+      overflow: 'hidden',
     });
+
+    // --- Inject animations ---
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.15); opacity: 1; }
+      }
+      @keyframes confetti-fall {
+        0% { transform: translateY(-5vh) rotate(0deg); opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 0.7; }
+        100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
+      }
+      @keyframes entrance-up {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // --- Confetti rain layer ---
+    this.spawnConfetti();
+
+    // --- Content elements (all start hidden for entrance anim) ---
+    const elements: HTMLElement[] = [];
 
     // Decorative top row: palms + rosé
     const deco = document.createElement('div');
@@ -36,6 +72,7 @@ export class StartScreen {
       letterSpacing: '0.5rem',
       filter: 'drop-shadow(0 0 12px rgba(232,137,154,0.6))',
     });
+    elements.push(deco);
 
     // Main title: THE BIG LIE.
     const title = document.createElement('h1');
@@ -51,6 +88,7 @@ export class StartScreen {
       textShadow: 'none',
       lineHeight: '1.1',
     });
+    elements.push(title);
 
     // Subtitle with Cannes reference
     const subtitle = document.createElement('p');
@@ -64,6 +102,7 @@ export class StartScreen {
       opacity: '0.7',
       marginBottom: '0.6rem',
     });
+    elements.push(subtitle);
 
     // Decorative bottom row
     const deco2 = document.createElement('div');
@@ -74,15 +113,16 @@ export class StartScreen {
       letterSpacing: '0.4rem',
       filter: 'drop-shadow(0 0 10px rgba(255,215,0,0.5))',
     });
+    elements.push(deco2);
 
     // Hand pistol icon
-    this.handIcon = document.createElement('div');
-    this.handIcon.textContent = '\u{1F449}';
-    Object.assign(this.handIcon.style, {
+    const handIcon = document.createElement('div');
+    handIcon.textContent = '\u{1F449}';
+    Object.assign(handIcon.style, {
       fontSize: '5rem',
       margin: '1rem 0',
-      animation: 'pulse 1.5s ease-in-out infinite',
     });
+    elements.push(handIcon);
 
     const instruction = document.createElement('p');
     instruction.textContent = 'Form a pistol gesture to start';
@@ -91,6 +131,7 @@ export class StartScreen {
       color: '#ccc',
       marginBottom: '0.5rem',
     });
+    elements.push(instruction);
 
     const hint = document.createElement('p');
     hint.textContent = 'Point with your index finger, curl the rest';
@@ -98,26 +139,58 @@ export class StartScreen {
       fontSize: '0.85rem',
       color: '#888',
     });
+    elements.push(hint);
 
-    // Inject pulse animation
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes pulse {
-        0%, 100% { transform: scale(1); opacity: 0.8; }
-        50% { transform: scale(1.15); opacity: 1; }
-      }
-    `;
-    document.head.appendChild(style);
+    // Apply entrance animation with staggered delays
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      el.style.opacity = '0';
+      el.style.animation = `entrance-up 0.6s ease-out ${i * 0.12}s forwards`;
+      this.overlay.appendChild(el);
+    }
 
-    this.overlay.appendChild(deco);
-    this.overlay.appendChild(title);
-    this.overlay.appendChild(subtitle);
-    this.overlay.appendChild(deco2);
-    this.overlay.appendChild(this.handIcon);
-    this.overlay.appendChild(instruction);
-    this.overlay.appendChild(hint);
+    // Pulse on hand icon after entrance completes
+    const pulseDelay = elements.length * 0.12 + 0.6;
+    setTimeout(() => {
+      handIcon.style.animation = 'pulse 1.5s ease-in-out infinite';
+    }, pulseDelay * 1000);
 
     document.body.appendChild(this.overlay);
+  }
+
+  private spawnConfetti(): void {
+    const container = document.createElement('div');
+    Object.assign(container.style, {
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      pointerEvents: 'none',
+      zIndex: '0',
+    });
+
+    for (let i = 0; i < 25; i++) {
+      const particle = document.createElement('div');
+      particle.textContent = CONFETTI_EMOJIS[Math.floor(Math.random() * CONFETTI_EMOJIS.length)];
+      const size = 1 + Math.random() * 1.5;
+      const left = Math.random() * 100;
+      const duration = 4 + Math.random() * 6;
+      const delay = Math.random() * duration;
+
+      Object.assign(particle.style, {
+        position: 'absolute',
+        left: `${left}%`,
+        top: '-5vh',
+        fontSize: `${size}rem`,
+        opacity: '0',
+        animation: `confetti-fall ${duration}s linear ${delay}s infinite`,
+        pointerEvents: 'none',
+      });
+      container.appendChild(particle);
+    }
+
+    this.overlay.appendChild(container);
   }
 
   hide(): void {
