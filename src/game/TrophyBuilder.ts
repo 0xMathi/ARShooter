@@ -117,7 +117,84 @@ export function createTrophy(tier: TrophyTier, assets: TrophyAssets): THREE.Grou
   return group;
 }
 
+/** Procedural Cannes Rosé bottle (special rare target) */
+export function createRoséBottle(envMap: THREE.Texture): THREE.Group {
+  const group = new THREE.Group();
+  const rosé = 0xE8899A;
+
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: rosé,
+    metalness: 0.1,
+    roughness: 0.3,
+    envMap,
+    envMapIntensity: 0.8,
+    emissive: rosé,
+    emissiveIntensity: 0.3,
+    transparent: true,
+    opacity: 0.85,
+  });
+
+  // Body
+  const bodyGeo = new THREE.CylinderGeometry(10, 10, 35, 12);
+  const body = new THREE.Mesh(bodyGeo, glassMat);
+  group.add(body);
+
+  // Shoulder (tapered)
+  const shoulderGeo = new THREE.CylinderGeometry(4, 10, 10, 12);
+  const shoulder = new THREE.Mesh(shoulderGeo, glassMat);
+  shoulder.position.y = 22.5;
+  group.add(shoulder);
+
+  // Neck
+  const neckGeo = new THREE.CylinderGeometry(4, 4, 15, 8);
+  const neck = new THREE.Mesh(neckGeo, glassMat);
+  neck.position.y = 35;
+  group.add(neck);
+
+  // Gold foil cap
+  const capMat = new THREE.MeshStandardMaterial({
+    color: 0xFFD700,
+    metalness: 0.9,
+    roughness: 0.2,
+    envMap,
+    envMapIntensity: 1.5,
+    emissive: 0xFFD700,
+    emissiveIntensity: 0.4,
+  });
+  const capGeo = new THREE.CylinderGeometry(5, 5, 4, 8);
+  const cap = new THREE.Mesh(capGeo, capMat);
+  cap.position.y = 44;
+  group.add(cap);
+
+  // Cream label on front
+  const labelGeo = new THREE.PlaneGeometry(14, 10);
+  const labelMat = new THREE.MeshStandardMaterial({
+    color: 0xFFF8F0,
+    metalness: 0,
+    roughness: 0.9,
+    side: THREE.DoubleSide,
+  });
+  const label = new THREE.Mesh(labelGeo, labelMat);
+  label.position.set(0, 0, 10.5);
+  group.add(label);
+
+  // Pink glow ring
+  const glowGeo = new THREE.TorusGeometry(32, 1.5, 8, 32);
+  const glowMat = new THREE.MeshStandardMaterial({
+    color: rosé,
+    emissive: rosé,
+    emissiveIntensity: 1.8,
+    transparent: true,
+    opacity: 0.35,
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  return group;
+}
+
 /** Get the hex color for a tier (for fragments, VFX) */
 export function getTierColor(tier: TrophyTier): number {
   return TIER_CONFIG[tier].color;
 }
+
+export const ROSÉ_COLOR = 0xE8899A;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SceneManager } from '../engine/SceneManager';
-import { createTrophy, getTierColor, type TrophyTier, type TrophyAssets } from './TrophyBuilder';
+import { createTrophy, createRoséBottle, getTierColor, ROSÉ_COLOR, type TrophyTier, type TrophyAssets } from './TrophyBuilder';
 
 interface Trophy {
   id: number;
@@ -11,6 +11,7 @@ interface Trophy {
   screenY: number;
   radius: number;
   tier: TrophyTier;
+  isRosé: boolean;
 }
 
 // Spawn weights: [tier, cumulative probability]
@@ -32,6 +33,12 @@ const SPEED_RAMP_INTERVAL = 30;
 const SPEED_RAMP_AMOUNT = 15;
 const SPEED_RAMP_MAX = 80;
 
+// Rosé bottle: rare special target
+const ROSÉ_INTERVAL = 15; // seconds between spawns
+const ROSÉ_SPEED = 90;
+const ROSÉ_SCALE = 1.1;
+const ROSÉ_HIT_RADIUS = 80;
+
 /**
  * Manages Cannes Lions trophy targets.
  * Three tiers: Bronze (common), Silver (medium), Gold (rare + fast + small).
@@ -43,6 +50,7 @@ export class DiscManager {
   private nextId = 0;
   private fragments: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number }[] = [];
   private elapsedTime = 0;
+  private nextRoséTime = ROSÉ_INTERVAL;
 
   constructor(scene: SceneManager, assets: TrophyAssets) {
     this.scene = scene;
@@ -81,11 +89,18 @@ export class DiscManager {
       const worldPos = this.scene.screenToWorld(trophy.screenX, trophy.screenY);
       trophy.mesh.position.set(worldPos.x, worldPos.y, 0);
 
-      // Gentle face-on spin with slight wobble (plane faces camera)
       const t = this.elapsedTime;
-      trophy.mesh.rotation.z += dt * 1.2;
-      trophy.mesh.rotation.x = Math.sin(t * 2 + trophy.id * 2) * 0.15;
-      trophy.mesh.rotation.y = Math.cos(t * 3 + trophy.id * 3) * 0.15;
+      if (trophy.isRosé) {
+        // Bottle tumble - more dynamic, eye-catching
+        trophy.mesh.rotation.y += dt * 2.5;
+        trophy.mesh.rotation.x += dt * 1.0;
+        trophy.mesh.rotation.z = Math.sin(t * 3 + trophy.id) * 0.3;
+      } else {
+        // Gentle face-on spin with slight wobble (plane faces camera)
+        trophy.mesh.rotation.z += dt * 1.2;
+        trophy.mesh.rotation.x = Math.sin(t * 2 + trophy.id * 2) * 0.15;
+        trophy.mesh.rotation.y = Math.cos(t * 3 + trophy.id * 3) * 0.15;
+      }
 
       const margin = 100;
       if (
@@ -117,13 +132,23 @@ export class DiscManager {
     }
 
     this.trophies = this.trophies.filter((t) => t.alive);
-    while (this.trophies.length < TARGET_COUNT) {
+
+    // Maintain normal trophy count (exclude rosé from count)
+    let normalCount = this.trophies.filter(t => !t.isRosé).length;
+    while (normalCount < TARGET_COUNT) {
       this.spawnTrophy();
+      normalCount++;
+    }
+
+    // Rosé spawning (timer-based, max 1 on screen)
+    if (this.elapsedTime >= this.nextRoséTime && !this.trophies.some(t => t.isRosé && t.alive)) {
+      this.spawnRosé();
+      this.nextRoséTime = this.elapsedTime + ROSÉ_INTERVAL;
     }
   }
 
-  /** Check hit. Returns position + tier or null. */
-  checkHit(screenX: number, screenY: number): { x: number; y: number; tier: TrophyTier } | null {
+  /** Check hit. Returns position + tier + rosé flag or null. */
+  checkHit(screenX: number, screenY: number): { x: number; y: number; tier: TrophyTier; isRosé: boolean } | null {
     let closest: Trophy | null = null;
     let closestDist = Infinity;
 
@@ -140,7 +165,7 @@ export class DiscManager {
     }
 
     if (closest) {
-      const result = { x: closest.screenX, y: closest.screenY, tier: closest.tier };
+      const result = { x: closest.screenX, y: closest.screenY, tier: closest.tier, isRosé: closest.isRosé };
       this.shatterTrophy(closest);
       return result;
     }
@@ -214,6 +239,53 @@ export class DiscManager {
       screenY: startY,
       radius: TIER_HIT_RADIUS[tier],
       tier,
+      isRosé: false,
+    });
+  }
+
+  private spawnRosé(): void {
+    const { width, height } = this.scene.getSize();
+
+    const edge = Math.floor(Math.random() * 4);
+    let startX: number, startY: number;
+    const margin = 60;
+
+    switch (edge) {
+      case 0: startX = Math.random() * width; startY = -margin; break;
+      case 1: startX = width + margin; startY = Math.random() * height; break;
+      case 2: startX = Math.random() * width; startY = height + margin; break;
+      default: startX = -margin; startY = Math.random() * height; break;
+    }
+
+    const targetX = width / 2 + (Math.random() - 0.5) * width * 0.3;
+    const targetY = height / 2 + (Math.random() - 0.5) * height * 0.3;
+
+    const dx = targetX - startX;
+    const dy = targetY - startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const velocity = new THREE.Vector2(
+      (dx / dist) * ROSÉ_SPEED,
+      (dy / dist) * ROSÉ_SPEED
+    );
+
+    const group = createRoséBottle(this.assets.envMap);
+    group.scale.set(ROSÉ_SCALE, ROSÉ_SCALE, ROSÉ_SCALE);
+
+    const worldPos = this.scene.screenToWorld(startX, startY);
+    group.position.set(worldPos.x, worldPos.y, 0);
+
+    this.scene.scene.add(group);
+
+    this.trophies.push({
+      id: this.nextId++,
+      mesh: group,
+      velocity,
+      alive: true,
+      screenX: startX,
+      screenY: startY,
+      radius: ROSÉ_HIT_RADIUS,
+      tier: 'bronze', // placeholder, not used for scoring
+      isRosé: true,
     });
   }
 
@@ -226,7 +298,7 @@ export class DiscManager {
   private shatterTrophy(trophy: Trophy): void {
     trophy.alive = false;
 
-    const color = getTierColor(trophy.tier);
+    const color = trophy.isRosé ? ROSÉ_COLOR : getTierColor(trophy.tier);
     const pos = this.scene.screenToWorld(trophy.screenX, trophy.screenY);
 
     this.scene.scene.remove(trophy.mesh);
@@ -234,8 +306,7 @@ export class DiscManager {
       if (child instanceof THREE.Mesh) this.disposeMesh(child);
     });
 
-    // More fragments for higher tiers
-    const fragCount = trophy.tier === 'gold' ? 12 : trophy.tier === 'silver' ? 10 : 8;
+    const fragCount = trophy.isRosé ? 15 : trophy.tier === 'gold' ? 12 : trophy.tier === 'silver' ? 10 : 8;
 
     for (let i = 0; i < fragCount; i++) {
       const fragGeo = new THREE.TetrahedronGeometry(6 + Math.random() * 8);
@@ -283,5 +354,7 @@ export class DiscManager {
     }
     this.trophies = [];
     this.fragments = [];
+    this.elapsedTime = 0;
+    this.nextRoséTime = ROSÉ_INTERVAL;
   }
 }

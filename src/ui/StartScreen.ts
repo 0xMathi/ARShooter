@@ -1,6 +1,6 @@
 /**
  * Start screen overlay.
- * Shows instructions and waits for pistol gesture to begin.
+ * "The Big Lie." - Cannes Lions satirical branding.
  */
 export class StartScreen {
   private overlay: HTMLDivElement;
@@ -15,7 +15,7 @@ export class StartScreen {
       left: '0',
       width: '100vw',
       height: '100vh',
-      background: 'rgba(0, 0, 0, 0.75)',
+      background: 'rgba(0, 0, 0, 0.78)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -27,24 +27,60 @@ export class StartScreen {
       padding: '2rem',
     });
 
-    const title = document.createElement('h1');
-    title.textContent = 'AR SHOOTER';
-    Object.assign(title.style, {
-      fontSize: '3rem',
-      fontWeight: '700',
-      letterSpacing: '0.3rem',
-      marginBottom: '1rem',
-      background: 'linear-gradient(90deg, #00f0ff, #ff00e0)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
+    // Decorative top row: palms + rosé
+    const deco = document.createElement('div');
+    deco.textContent = '\u{1F334}\u{1F377}\u{1F334}';
+    Object.assign(deco.style, {
+      fontSize: '2.5rem',
+      marginBottom: '0.8rem',
+      letterSpacing: '0.5rem',
+      filter: 'drop-shadow(0 0 12px rgba(232,137,154,0.6))',
     });
 
-    // Hand pistol icon (emoji-based)
+    // Main title: THE BIG LIE.
+    const title = document.createElement('h1');
+    title.textContent = 'THE BIG LIE.';
+    Object.assign(title.style, {
+      fontSize: '3.2rem',
+      fontWeight: '800',
+      letterSpacing: '0.25rem',
+      marginBottom: '0.4rem',
+      background: 'linear-gradient(90deg, #FFD700, #E8899A, #FFD700)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      textShadow: 'none',
+      lineHeight: '1.1',
+    });
+
+    // Subtitle with Cannes reference
+    const subtitle = document.createElement('p');
+    subtitle.textContent = 'Cannes Lions Edition';
+    Object.assign(subtitle.style, {
+      fontSize: '0.85rem',
+      fontWeight: '400',
+      letterSpacing: '0.35rem',
+      textTransform: 'uppercase',
+      color: '#FFD700',
+      opacity: '0.7',
+      marginBottom: '0.6rem',
+    });
+
+    // Decorative bottom row
+    const deco2 = document.createElement('div');
+    deco2.textContent = '\u{1F377}\u{1F3C6}\u{1F377}';
+    Object.assign(deco2.style, {
+      fontSize: '1.8rem',
+      marginBottom: '1.5rem',
+      letterSpacing: '0.4rem',
+      filter: 'drop-shadow(0 0 10px rgba(255,215,0,0.5))',
+    });
+
+    // Hand pistol icon
     this.handIcon = document.createElement('div');
     this.handIcon.textContent = '\u{1F449}';
     Object.assign(this.handIcon.style, {
       fontSize: '5rem',
-      margin: '1.5rem 0',
+      margin: '1rem 0',
       animation: 'pulse 1.5s ease-in-out infinite',
     });
 
@@ -73,7 +109,10 @@ export class StartScreen {
     `;
     document.head.appendChild(style);
 
+    this.overlay.appendChild(deco);
     this.overlay.appendChild(title);
+    this.overlay.appendChild(subtitle);
+    this.overlay.appendChild(deco2);
     this.overlay.appendChild(this.handIcon);
     this.overlay.appendChild(instruction);
     this.overlay.appendChild(hint);

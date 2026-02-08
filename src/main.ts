@@ -126,17 +126,30 @@ async function init(): Promise<void> {
 
       const hit = discManager.checkHit(x, y);
       if (hit) {
-        const tierMult = TIER_SCORE[hit.tier];
-        const result = scoreManager.hit(tierMult);
-        soundManager.playHit();
-        vfxText.hit(hit.x, hit.y, result.points, result.combo, TIER_VFX_COLOR[hit.tier]);
-        sceneManager.shake(6 + Math.min(result.combo, 10));
-        hitStopUntil = performance.now() + HIT_STOP_DURATION;
-        hud.popScore();
-        if (result.combo > 1) hud.popCombo();
-        if (result.combo > 0 && result.combo % 5 === 0) {
+        if (hit.isRosé) {
+          // Rosé bonus: 10x multiplier, extra shake, special VFX
+          const result = scoreManager.hit(10);
           soundManager.playCombo();
+          soundManager.playHit();
+          vfxText.spawn('ROSÉ!', hit.x, hit.y - 30, '#E8899A', 1.5);
+          vfxText.hit(hit.x, hit.y, result.points, result.combo, '#E8899A');
+          sceneManager.shake(15);
+          hitStopUntil = performance.now() + HIT_STOP_DURATION * 2;
+          hud.popScore();
           hud.popMulti();
+        } else {
+          const tierMult = TIER_SCORE[hit.tier];
+          const result = scoreManager.hit(tierMult);
+          soundManager.playHit();
+          vfxText.hit(hit.x, hit.y, result.points, result.combo, TIER_VFX_COLOR[hit.tier]);
+          sceneManager.shake(6 + Math.min(result.combo, 10));
+          hitStopUntil = performance.now() + HIT_STOP_DURATION;
+          hud.popScore();
+          if (result.combo > 1) hud.popCombo();
+          if (result.combo > 0 && result.combo % 5 === 0) {
+            soundManager.playCombo();
+            hud.popMulti();
+          }
         }
       } else {
         scoreManager.miss();
