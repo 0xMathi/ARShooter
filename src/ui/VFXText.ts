@@ -15,6 +15,16 @@ export class VFXText {
     const flash = document.getElementById('screen-flash');
     if (!flash) throw new Error('Screen flash element not found');
     this.flashEl = flash;
+
+    // Inject emoji burst keyframe
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes emoji-burst {
+        0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+        100% { transform: translate(calc(-50% + var(--vx) * 1px), calc(-50% + var(--vy) * 1px)) scale(0.3) rotate(var(--rot)); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   /** Full-screen flash overlay on hit */
@@ -98,5 +108,35 @@ export class VFXText {
   /** MISS feedback */
   miss(x: number, y: number): void {
     this.spawn('MISS', x, y, '#ff4444', 0.9);
+  }
+
+  /** Radial emoji particle burst at screen position */
+  emojiExplosion(x: number, y: number, emojis: string[], count: number): void {
+    for (let i = 0; i < count; i++) {
+      const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+      const speed = 100 + Math.random() * 80;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      const rot = Math.random() * 720 - 360;
+
+      const el = document.createElement('div');
+      el.textContent = emoji;
+      el.style.cssText = `
+        position: absolute;
+        left: ${x}px;
+        top: ${y}px;
+        font-size: 1.6rem;
+        pointer-events: none;
+        z-index: 15;
+        --vx: ${vx};
+        --vy: ${vy};
+        --rot: ${rot}deg;
+        animation: emoji-burst 0.9s ease-out forwards;
+      `;
+
+      this.container.appendChild(el);
+      setTimeout(() => el.remove(), 950);
+    }
   }
 }

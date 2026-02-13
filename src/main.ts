@@ -119,6 +119,8 @@ async function init(): Promise<void> {
       silver: '#D8D8D8',
       bronze: '#CD7F32',
     };
+    const GOLD_EMOJIS = ['\u{1F3C6}', '\u2B50', '\u{1F4B0}', '\u{1F451}', '\u2728'];
+    const ROSÉ_EMOJIS = ['\u{1F377}', '\u{1F942}', '\u{1F480}', '\u{1F338}', '\u{1F495}'];
 
     /** Central shoot function */
     function shoot(x: number, y: number): void {
@@ -140,6 +142,7 @@ async function init(): Promise<void> {
           soundManager.playHit();
           vfxText.spawn('ROSÉ!', hit.x, hit.y - 30, '#E8899A', 1.5);
           vfxText.hit(hit.x, hit.y, result.points, result.combo, '#E8899A');
+          vfxText.emojiExplosion(hit.x, hit.y, ROSÉ_EMOJIS, 12);
           vfxText.screenFlash('#E8899A', 0.4);
           sceneManager.shake(15);
           hitStopUntil = performance.now() + HIT_STOP_DURATION * 2;
@@ -150,6 +153,9 @@ async function init(): Promise<void> {
           const result = scoreManager.hit(tierMult);
           soundManager.playHit();
           vfxText.hit(hit.x, hit.y, result.points, result.combo, TIER_VFX_COLOR[hit.tier]);
+          if (hit.tier === 'gold') {
+            vfxText.emojiExplosion(hit.x, hit.y, GOLD_EMOJIS, 10);
+          }
           vfxText.screenFlash('#ffffff', 0.2);
           sceneManager.shake(6 + Math.min(result.combo, 10));
           hitStopUntil = performance.now() + HIT_STOP_DURATION;
