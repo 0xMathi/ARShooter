@@ -1,3 +1,5 @@
+import { LeaderboardScreen } from './LeaderboardScreen';
+
 const STORAGE_KEY = 'ar-shooter-best-score';
 
 /** Sarcastic Cannes rank tiers based on score */
@@ -513,6 +515,37 @@ export class GameOverScreen {
     shareBtn.addEventListener('click', (e) => e.stopPropagation());
     elements.push(shareBtn);
 
+    // --- Leaderboard button ---
+    const lbBtn = document.createElement('button');
+    lbBtn.textContent = 'HIGH SCORES';
+    Object.assign(lbBtn.style, {
+      fontSize: '0.8rem',
+      fontWeight: '700',
+      color: '#00f0ff',
+      background: 'transparent',
+      border: '2px solid #00f0ff',
+      borderRadius: '8px',
+      padding: '12px 24px',
+      marginBottom: '1rem',
+      cursor: 'pointer',
+      letterSpacing: '0.1rem',
+      boxShadow: '0 4px 16px rgba(0, 240, 255, 0.15)',
+      transition: 'transform 0.1s ease',
+      pointerEvents: 'auto',
+    });
+    lbBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      lbBtn.style.transform = 'scale(0.95)';
+    });
+    lbBtn.addEventListener('pointerup', (e) => {
+      e.stopPropagation();
+      lbBtn.style.transform = 'scale(1)';
+      const lb = new LeaderboardScreen();
+      lb.show(score, maxCombo, rank.title);
+    });
+    lbBtn.addEventListener('click', (e) => e.stopPropagation());
+    elements.push(lbBtn);
+
     // --- Restart prompt ---
     const restart = document.createElement('div');
     restart.textContent = 'TAP TO PLAY AGAIN';
@@ -555,6 +588,12 @@ export class GameOverScreen {
     requestAnimationFrame(() => {
       this.overlay.style.opacity = '1';
     });
+
+    // Auto-open leaderboard name input after envelope animation
+    setTimeout(() => {
+      const lb = new LeaderboardScreen();
+      lb.show(score, maxCombo, rank.title);
+    }, 3200);
   }
 
   hide(): void {
