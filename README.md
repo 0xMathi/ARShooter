@@ -4,7 +4,7 @@
 
 > *"Congratulations on your Gold Lion! That'll be €28,000."*
 
-**The Big Lie** is a browser-based augmented reality arcade game where you shoot Cannes Lions trophies out of the sky with your bare hand. No controller. No app download. Just your webcam, a pistol gesture, and deep-seated resentment toward the advertising awards industry.
+**The Big Lie** is a browser-based augmented reality arcade game where you shoot Cannes Lions trophies out of the sky with your bare hand. No controller. No app download. Just your webcam, a pistol gesture, and deep-seated irritation toward the advertising awards industry.
 
 ## [Play Now](https://thebiglie.vercel.app)
 
