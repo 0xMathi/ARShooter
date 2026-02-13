@@ -73,8 +73,6 @@ Open `localhost:5173` in Chrome. You need a webcam.
 
 ## Disclaimer
 
-No actual Cannes Lions were harmed in the making of this game. The festival does that to itself.
+No actual Cannes Lions were harmed in the making of this game. The festival already does that to itself.
 
 ---
-
-*Built with mass-resignation energy at 2 AM.*
