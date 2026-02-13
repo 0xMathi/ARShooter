@@ -9,6 +9,14 @@ const LASER_COLOR = 0xff2200;
 const CROSSHAIR_COLOR_DEFAULT = 0x00f0ff;
 const CROSSHAIR_COLOR_LOCKED = 0x00ff88;
 
+// Muzzle flash
+const MUZZLE_FLASH_DURATION = 100; // ms
+const MUZZLE_FLASH_MAX_SCALE = 60; // world units (ortho camera)
+
+// Tracer
+const TRACER_DURATION = 150; // ms
+const TRACER_COLOR = 0xffffaa;
+
 /**
  * Handles the aiming system: crosshair, laser line, and magnetic aim assist.
  */
@@ -23,6 +31,15 @@ export class ShootingSystem {
   // Laser line
   private laserLine: THREE.Line;
   private laserMaterial: THREE.LineBasicMaterial;
+
+  // Muzzle flash
+  private flashSprite: THREE.Sprite;
+  private flashStartTime = 0;
+
+  // Tracer
+  private tracerLine: THREE.Line;
+  private tracerMaterial: THREE.LineBasicMaterial;
+  private tracerStartTime = 0;
 
   // Current aim state
   private currentAim: ScreenPosition = { x: 0, y: 0 };
@@ -105,6 +122,47 @@ export class ShootingSystem {
     this.laserLine.visible = false;
     this.laserLine.position.z = 50;
     scene.scene.add(this.laserLine);
+
+    // Muzzle flash sprite (canvas radial gradient texture)
+    const flashCanvas = document.createElement('canvas');
+    flashCanvas.width = 64;
+    flashCanvas.height = 64;
+    const ctx = flashCanvas.getContext('2d')!;
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 200, 60, 0.9)');
+    gradient.addColorStop(0.7, 'rgba(255, 120, 0, 0.4)');
+    gradient.addColorStop(1, 'rgba(255, 80, 0, 0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+
+    const flashTexture = new THREE.CanvasTexture(flashCanvas);
+    const flashMat = new THREE.SpriteMaterial({
+      map: flashTexture,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.flashSprite = new THREE.Sprite(flashMat);
+    this.flashSprite.visible = false;
+    this.flashSprite.position.z = 90;
+    scene.scene.add(this.flashSprite);
+
+    // Tracer line (reusable)
+    this.tracerMaterial = new THREE.LineBasicMaterial({
+      color: TRACER_COLOR,
+      transparent: true,
+      opacity: 1,
+      linewidth: 2,
+    });
+    const tracerGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, 0),
+    ]);
+    this.tracerLine = new THREE.Line(tracerGeo, this.tracerMaterial);
+    this.tracerLine.visible = false;
+    this.tracerLine.position.z = 80;
+    scene.scene.add(this.tracerLine);
   }
 
   /**
@@ -183,6 +241,30 @@ export class ShootingSystem {
     // Laser opacity pulses when locked
     this.laserMaterial.opacity = this.isLocked ? 0.9 : 0.5;
 
+    // Animate muzzle flash
+    const now = performance.now();
+    if (this.flashSprite.visible) {
+      const elapsed = now - this.flashStartTime;
+      if (elapsed >= MUZZLE_FLASH_DURATION) {
+        this.flashSprite.visible = false;
+      } else {
+        const t = elapsed / MUZZLE_FLASH_DURATION;
+        const scale = MUZZLE_FLASH_MAX_SCALE * (0.3 + 0.7 * (1 - t * t));
+        this.flashSprite.scale.set(scale, scale, 1);
+        (this.flashSprite.material as THREE.SpriteMaterial).opacity = 1 - t;
+      }
+    }
+
+    // Animate tracer
+    if (this.tracerLine.visible) {
+      const elapsed = now - this.tracerStartTime;
+      if (elapsed >= TRACER_DURATION) {
+        this.tracerLine.visible = false;
+      } else {
+        this.tracerMaterial.opacity = 1 - elapsed / TRACER_DURATION;
+      }
+    }
+
     return this.currentAim;
   }
 
@@ -194,6 +276,37 @@ export class ShootingSystem {
     return this.isLocked;
   }
 
+  /** Trigger muzzle flash at hand position */
+  flash(handBase: ScreenPosition): void {
+    const world = this.scene.screenToWorld(handBase.x, handBase.y);
+    this.flashSprite.position.x = world.x;
+    this.flashSprite.position.y = world.y;
+    this.flashSprite.visible = true;
+    this.flashStartTime = performance.now();
+    (this.flashSprite.material as THREE.SpriteMaterial).opacity = 1;
+    this.flashSprite.scale.set(MUZZLE_FLASH_MAX_SCALE, MUZZLE_FLASH_MAX_SCALE, 1);
+  }
+
+  /** Show tracer line from hand to target (hits only) */
+  showTracer(handBase: ScreenPosition, target: ScreenPosition): void {
+    const worldBase = this.scene.screenToWorld(handBase.x, handBase.y);
+    const worldTarget = this.scene.screenToWorld(target.x, target.y);
+    const positions = this.tracerLine.geometry.attributes.position;
+    if (positions) {
+      const arr = positions.array as Float32Array;
+      arr[0] = worldBase.x;
+      arr[1] = worldBase.y;
+      arr[2] = 80;
+      arr[3] = worldTarget.x;
+      arr[4] = worldTarget.y;
+      arr[5] = 80;
+      positions.needsUpdate = true;
+    }
+    this.tracerLine.visible = true;
+    this.tracerMaterial.opacity = 1;
+    this.tracerStartTime = performance.now();
+  }
+
   hide(): void {
     this.crosshairGroup.visible = false;
     this.laserLine.visible = false;
@@ -202,5 +315,7 @@ export class ShootingSystem {
   dispose(): void {
     this.scene.scene.remove(this.crosshairGroup);
     this.scene.scene.remove(this.laserLine);
+    this.scene.scene.remove(this.flashSprite);
+    this.scene.scene.remove(this.tracerLine);
   }
 }

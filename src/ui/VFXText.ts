@@ -4,11 +4,31 @@
  */
 export class VFXText {
   private container: HTMLElement;
+  private flashEl: HTMLElement;
+  private flashTimer = 0;
 
   constructor() {
     const hud = document.getElementById('hud');
     if (!hud) throw new Error('HUD element not found');
     this.container = hud;
+
+    const flash = document.getElementById('screen-flash');
+    if (!flash) throw new Error('Screen flash element not found');
+    this.flashEl = flash;
+  }
+
+  /** Full-screen flash overlay on hit */
+  screenFlash(color: string, intensity: number): void {
+    clearTimeout(this.flashTimer);
+    this.flashEl.style.transition = 'none';
+    this.flashEl.style.background = color;
+    this.flashEl.style.opacity = String(intensity);
+
+    // Force reflow so transition applies on next frame
+    this.flashEl.offsetHeight;
+
+    this.flashEl.style.transition = 'opacity 120ms ease-out';
+    this.flashEl.style.opacity = '0';
   }
 
   /** Spawn a floating text at screen position */

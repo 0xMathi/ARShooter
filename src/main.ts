@@ -122,10 +122,17 @@ async function init(): Promise<void> {
 
     /** Central shoot function */
     function shoot(x: number, y: number): void {
+      // Muzzle flash at hand (always, even on miss)
+      const handPos = gestureDetector.getLastHandBase();
+      if (handPos) shootingSystem.flash(handPos);
+
       soundManager.playShoot();
 
       const hit = discManager.checkHit(x, y);
       if (hit) {
+        // Tracer from hand to hit
+        if (handPos) shootingSystem.showTracer(handPos, { x: hit.x, y: hit.y });
+
         if (hit.isRosé) {
           // Rosé bonus: 10x multiplier, extra shake, special VFX
           const result = scoreManager.hit(10);
@@ -133,6 +140,7 @@ async function init(): Promise<void> {
           soundManager.playHit();
           vfxText.spawn('ROSÉ!', hit.x, hit.y - 30, '#E8899A', 1.5);
           vfxText.hit(hit.x, hit.y, result.points, result.combo, '#E8899A');
+          vfxText.screenFlash('#E8899A', 0.4);
           sceneManager.shake(15);
           hitStopUntil = performance.now() + HIT_STOP_DURATION * 2;
           hud.popScore();
@@ -142,6 +150,7 @@ async function init(): Promise<void> {
           const result = scoreManager.hit(tierMult);
           soundManager.playHit();
           vfxText.hit(hit.x, hit.y, result.points, result.combo, TIER_VFX_COLOR[hit.tier]);
+          vfxText.screenFlash('#ffffff', 0.2);
           sceneManager.shake(6 + Math.min(result.combo, 10));
           hitStopUntil = performance.now() + HIT_STOP_DURATION;
           hud.popScore();

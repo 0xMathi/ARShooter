@@ -15,6 +15,7 @@ const THUMB_BENT_ANGLE = 155; // degrees - below this = thumb is bent = fire
 
 export class GestureDetector {
   private lastShotTime = 0;
+  private lastHandBase: ScreenPosition | null = null;
 
   private _debugInfo = {
     hasHand: false,
@@ -93,7 +94,12 @@ export class GestureDetector {
       triggered,
     };
 
+    this.lastHandBase = handBase;
     return { isPistol, aimPosition, handBase, triggered };
+  }
+
+  getLastHandBase(): ScreenPosition | null {
+    return this.lastHandBase;
   }
 
   /** Angle (degrees) at joint B, formed by points A-B-C */
@@ -128,5 +134,6 @@ export class GestureDetector {
 
   reset(): void {
     this.lastShotTime = 0;
+    this.lastHandBase = null;
   }
 }

@@ -48,7 +48,8 @@ export class DiscManager {
   private assets: TrophyAssets;
   private trophies: Trophy[] = [];
   private nextId = 0;
-  private fragments: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number }[] = [];
+  private fragments: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number; spin: THREE.Vector3 }[] = [];
+  private sparks: { mesh: THREE.Mesh; velocity: THREE.Vector3; life: number }[] = [];
   private elapsedTime = 0;
   private nextRoséTime = ROSÉ_INTERVAL;
 
@@ -118,6 +119,9 @@ export class DiscManager {
       const frag = this.fragments[i];
       frag.mesh.position.add(frag.velocity.clone().multiplyScalar(dt));
       frag.velocity.y -= 400 * dt;
+      frag.mesh.rotation.x += frag.spin.x * dt;
+      frag.mesh.rotation.y += frag.spin.y * dt;
+      frag.mesh.rotation.z += frag.spin.z * dt;
       frag.life -= dt;
 
       const mat = frag.mesh.material as THREE.MeshStandardMaterial;
@@ -128,6 +132,23 @@ export class DiscManager {
         mat.dispose();
         (frag.mesh.geometry as THREE.BufferGeometry).dispose();
         this.fragments.splice(i, 1);
+      }
+    }
+
+    // Update hit sparks
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const spark = this.sparks[i];
+      spark.mesh.position.add(spark.velocity.clone().multiplyScalar(dt));
+      spark.life -= dt;
+
+      const mat = spark.mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = Math.max(0, spark.life / 0.25);
+
+      if (spark.life <= 0) {
+        this.scene.scene.remove(spark.mesh);
+        mat.dispose();
+        spark.mesh.geometry.dispose();
+        this.sparks.splice(i, 1);
       }
     }
 
@@ -306,10 +327,12 @@ export class DiscManager {
       if (child instanceof THREE.Mesh) this.disposeMesh(child);
     });
 
+    // Shatter fragments (improved: wider speed range, varied sizes, spin)
     const fragCount = trophy.isRosé ? 15 : trophy.tier === 'gold' ? 12 : trophy.tier === 'silver' ? 10 : 8;
 
     for (let i = 0; i < fragCount; i++) {
-      const fragGeo = new THREE.TetrahedronGeometry(6 + Math.random() * 8);
+      const size = 4 + Math.random() * 12;
+      const fragGeo = new THREE.TetrahedronGeometry(size);
       const fragMat = new THREE.MeshStandardMaterial({
         color,
         emissive: color,
@@ -321,17 +344,54 @@ export class DiscManager {
       });
       const fragMesh = new THREE.Mesh(fragGeo, fragMat);
       fragMesh.position.copy(pos);
+      fragMesh.rotation.set(
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+        Math.random() * Math.PI * 2,
+      );
 
       const angle = (Math.PI * 2 * i) / fragCount + Math.random() * 0.5;
-      const spd = 200 + Math.random() * 300;
+      const spd = 300 + Math.random() * 400;
       const fragVelocity = new THREE.Vector3(
         Math.cos(angle) * spd,
-        Math.sin(angle) * spd + 100,
-        (Math.random() - 0.5) * 200
+        Math.sin(angle) * spd + 120,
+        (Math.random() - 0.5) * 250
+      );
+
+      const spin = new THREE.Vector3(
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 8,
+        (Math.random() - 0.5) * 6,
       );
 
       this.scene.scene.add(fragMesh);
-      this.fragments.push({ mesh: fragMesh, velocity: fragVelocity, life: 0.8 });
+      this.fragments.push({ mesh: fragMesh, velocity: fragVelocity, life: 0.8, spin });
+    }
+
+    // Hit sparks (fast, bright, short-lived)
+    const sparkCount = 10;
+    for (let i = 0; i < sparkCount; i++) {
+      const sparkGeo = new THREE.CircleGeometry(2, 6);
+      const sparkMat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 1,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const sparkMesh = new THREE.Mesh(sparkGeo, sparkMat);
+      sparkMesh.position.copy(pos);
+
+      const angle = Math.random() * Math.PI * 2;
+      const spd = 400 + Math.random() * 200;
+      const sparkVelocity = new THREE.Vector3(
+        Math.cos(angle) * spd,
+        Math.sin(angle) * spd,
+        (Math.random() - 0.5) * 100
+      );
+
+      this.scene.scene.add(sparkMesh);
+      this.sparks.push({ mesh: sparkMesh, velocity: sparkVelocity, life: 0.25 });
     }
   }
 
@@ -352,8 +412,14 @@ export class DiscManager {
       (frag.mesh.material as THREE.Material).dispose();
       frag.mesh.geometry.dispose();
     }
+    for (const spark of this.sparks) {
+      this.scene.scene.remove(spark.mesh);
+      (spark.mesh.material as THREE.Material).dispose();
+      spark.mesh.geometry.dispose();
+    }
     this.trophies = [];
     this.fragments = [];
+    this.sparks = [];
     this.elapsedTime = 0;
     this.nextRoséTime = ROSÉ_INTERVAL;
   }
