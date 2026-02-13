@@ -27,7 +27,7 @@ export class LoadingOverlay {
     });
 
     const title = document.createElement('h1');
-    title.textContent = 'AR SHOOTER';
+    title.textContent = 'THE BIG LIE.';
     Object.assign(title.style, {
       fontSize: '2.5rem',
       fontWeight: '700',
