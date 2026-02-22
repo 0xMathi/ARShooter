@@ -135,10 +135,20 @@ export class LeaderboardScreen {
 
     const input = document.createElement('input');
     input.type = 'text';
-    input.maxLength = 12;
-    input.placeholder = 'AAA';
+    input.maxLength = 10;
+    input.placeholder = 'MAX';
     input.autocomplete = 'off';
     input.className = 'lb-input';
+
+    // Allow only first name - strip spaces on input
+    input.addEventListener('input', () => {
+      const cursor = input.selectionStart ?? input.value.length;
+      const filtered = input.value.replace(/\s/g, '');
+      if (filtered !== input.value) {
+        input.value = filtered;
+        input.setSelectionRange(Math.max(0, cursor - 1), Math.max(0, cursor - 1));
+      }
+    });
     Object.assign(input.style, {
       fontFamily: FONT,
       fontSize: '1.4rem',
@@ -175,7 +185,7 @@ export class LeaderboardScreen {
 
     // Submit button
     const submitBtn = this.createButton('SUBMIT', '#FFD700', async () => {
-      const name = input.value.trim();
+      const name = input.value.trim().split(/\s/)[0];
       if (!name) {
         errorEl.textContent = 'ENTER A NAME FIRST';
         return;
